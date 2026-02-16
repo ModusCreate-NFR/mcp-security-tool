@@ -1,0 +1,13 @@
+# Server dependencies
+fastmcp>=2.0.0
+uvicorn>=0.30.0
+starlette>=0.38.0
+
+# Client dependencies - Anthropic API
+anthropic>=0.40.0
+
+# Client dependencies - AWS Bedrock
+boto3>=1.34.0
+
+# HTTP client (used by both clients)
+httpx>=0.27.0
