@@ -44,44 +44,254 @@ Security Tools API is a comprehensive penetration testing platform that combines
 ### Prerequisites
 
 - Python 3.11+
-- AWS Account with Bedrock access
-- EC2 instance (or local Docker)
+- AWS Account
+- Basic familiarity with AWS Console
 
-### 1. Clone Repository
+---
+
+### Step 1: AWS IAM Setup
+
+You need an IAM user with permissions to access AWS Bedrock (Claude AI).
+
+#### 1.1 Create IAM User
+
+1. Go to [AWS IAM Console](https://console.aws.amazon.com/iam/)
+2. Click **Users** → **Create user**
+3. User name: `security-tools-user`
+4. Click **Next**
+
+#### 1.2 Attach Permissions
+
+Select **Attach policies directly** and add these policies:
+
+| Policy | Purpose |
+|--------|---------|
+| `AmazonBedrockFullAccess` | Access Claude models |
+
+Or create a custom policy with minimum permissions:
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream"
+            ],
+            "Resource": "arn:aws:bedrock:*::foundation-model/anthropic.*"
+        }
+    ]
+}
+```
+
+#### 1.3 Create Access Keys
+
+1. Click on your new user → **Security credentials** tab
+2. Click **Create access key**
+3. Select **Command Line Interface (CLI)**
+4. Click **Create access key**
+5. **SAVE these credentials** (you won't see the secret key again):
+   - Access Key ID: `AKIA...`
+   - Secret Access Key: `wJalr...`
+
+---
+
+### Step 2: Launch EC2 Instance
+
+#### 2.1 Create Instance
+
+1. Go to [EC2 Console](https://console.aws.amazon.com/ec2/)
+2. Click **Launch Instance**
+
+| Setting | Value |
+|---------|-------|
+| Name | `security-tools-server` |
+| AMI | Amazon Linux 2023 |
+| Instance Type | `t3.medium` (4GB RAM for builds) |
+| Key Pair | Create new → Download `.pem` file |
+| Storage | 20 GB gp3 |
+
+#### 2.2 Configure Security Group
+
+Under **Network Settings**, click **Edit** and add:
+
+| Type | Port | Source | Purpose |
+|------|------|--------|---------|
+| SSH | 22 | My IP | SSH access |
+| Custom TCP | 8000 | My IP (or 0.0.0.0/0) | Tool API |
+
+#### 2.3 Launch and Note Public IP
+
+After launch, note the **Public IPv4 address** (e.g., `54.123.45.67`)
+
+---
+
+### Step 3: Deploy Server on EC2
+
+#### 3.1 Connect to EC2
+
+**Windows (PowerShell):**
+```powershell
+# Move key file
+Move-Item "$env:USERPROFILE\Downloads\your-key.pem" "$env:USERPROFILE\.ssh\"
+
+# Fix permissions
+icacls "$env:USERPROFILE\.ssh\your-key.pem" /inheritance:r /grant:r "$env:USERNAME:R"
+
+# Connect
+ssh -i "$env:USERPROFILE\.ssh\your-key.pem" ec2-user@YOUR_EC2_IP
+```
+
+**macOS/Linux:**
+```bash
+chmod 400 ~/Downloads/your-key.pem
+ssh -i ~/Downloads/your-key.pem ec2-user@YOUR_EC2_IP
+```
+
+#### 3.2 Install Docker on EC2
 
 ```bash
-git clone https://github.com/ModusCreate-NFR/mcp-security-tool.git
+# Update system
+sudo yum update -y
+
+# Install Docker and Git
+sudo yum install -y docker git
+
+# Start Docker
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add user to docker group
+sudo usermod -aG docker ec2-user
+
+# IMPORTANT: Logout and reconnect for group to take effect
+exit
+```
+
+Reconnect via SSH, then continue:
+
+#### 3.3 Clone and Build
+
+```bash
+# Clone repository
+git clone https://github.com/YOUR_ORG/security-tools-api.git
+cd security-tools-api
+
+# Build Docker image (takes 5-10 minutes)
+docker build -t security-tools .
+
+# Run container
+docker run -d -p 8000:8000 --name security-server security-tools
+
+# Verify it's running
+curl http://localhost:8000/health
+# Should return: {"status": "healthy", "tools_available": 25}
+```
+
+---
+
+### Step 4: Configure Client (Local Machine)
+
+#### 4.1 Clone Repository Locally
+
+```bash
+git clone https://github.com/YOUR_ORG/security-tools-api.git
 cd security-tools-api
 ```
 
-### 2. Deploy Server (EC2 with Docker)
+#### 4.2 Install Python Dependencies
 
 ```bash
-# On EC2 instance
-docker build -t security-tools .
-docker run -d -p 8000:8000 --name security-server security-tools
-```
+# Create virtual environment (recommended)
+python -m venv .venv
 
-### 3. Configure Client (Local Machine)
+# Activate virtual environment
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
 
-```bash
 # Install dependencies
 pip install -r requirements.txt
+```
 
-# Configure AWS credentials
+#### 4.3 Configure AWS Credentials
+
+**Option A: AWS CLI Configure (Recommended)**
+
+```bash
 aws configure
+```
 
-# Set server URL
+Enter when prompted:
+```
+AWS Access Key ID [None]: AKIAXXXXXXXXXXXXXXXX
+AWS Secret Access Key [None]: wJalrXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Default region name [None]: us-east-1
+Default output format [None]: json
+```
+
+**Option B: Environment Variables**
+
+**Windows (PowerShell):**
+```powershell
+$env:AWS_ACCESS_KEY_ID = "AKIAXXXXXXXXXXXXXXXX"
+$env:AWS_SECRET_ACCESS_KEY = "wJalrXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+$env:AWS_REGION = "us-east-1"
+```
+
+**macOS/Linux:**
+```bash
+export AWS_ACCESS_KEY_ID="AKIAXXXXXXXXXXXXXXXX"
+export AWS_SECRET_ACCESS_KEY="wJalrXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+export AWS_REGION="us-east-1"
+```
+
+#### 4.4 Set Server URL
+
+Point the client to your EC2 instance:
+
+**Windows (PowerShell):**
+```powershell
+$env:MCP_SERVER_URL = "http://YOUR_EC2_IP:8000"
+```
+
+**macOS/Linux:**
+```bash
 export MCP_SERVER_URL="http://YOUR_EC2_IP:8000"
 ```
 
-### 4. Run Assessment
+#### 4.5 Verify Connection
+
+```bash
+# Test EC2 connection
+curl http://YOUR_EC2_IP:8000/health
+
+# Test AWS credentials
+aws sts get-caller-identity
+```
+
+---
+
+### Step 5: Run Assessment
 
 ```bash
 python client_bedrock.py
 ```
 
 ```
+============================================================
+  Security Assessment Tool - AWS Bedrock Edition
+  Black-Box Penetration Testing Platform
+============================================================
+
+  Server: http://YOUR_EC2_IP:8000
+  Model: anthropic.claude-3-opus-20240229-v1:0
+  
+  Commands: 'help', 'report', 'quit'
+============================================================
+
 You: Perform a comprehensive security assessment of example.com
 
 [Claude executes tools systematically across 6 phases...]
@@ -91,6 +301,19 @@ You: report
 
 [Generates security_report_20260217_143022.md]
 ```
+
+---
+
+### Quick Reference Commands
+
+| Task | Command |
+|------|---------|
+| Start server (EC2) | `docker run -d -p 8000:8000 --name security-server security-tools` |
+| Check server health | `curl http://EC2_IP:8000/health` |
+| Start client | `python client_bedrock.py` |
+| Generate report | Type `report` in client |
+| Stop server | `docker stop security-server` |
+| View server logs | `docker logs security-server` |
 
 ---
 
@@ -294,6 +517,13 @@ See [COMPLETE-SETUP-GUIDE.md](COMPLETE-SETUP-GUIDE.md) for the full technical jo
 - [AWS Bedrock Pricing](https://aws.amazon.com/bedrock/pricing/) - Cost information
 
 ---
+
+## License
+
+MIT License - See LICENSE file
+
+---
+
 ## Credits
 
 Built on top of:
