@@ -50,7 +50,7 @@ Security Tools API is a comprehensive penetration testing platform that combines
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_ORG/security-tools-api.git
+git clone https://github.com/ModusCreate-NFR/mcp-security-tool.git
 cd security-tools-api
 ```
 
