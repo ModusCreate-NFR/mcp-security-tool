@@ -294,13 +294,6 @@ See [COMPLETE-SETUP-GUIDE.md](COMPLETE-SETUP-GUIDE.md) for the full technical jo
 - [AWS Bedrock Pricing](https://aws.amazon.com/bedrock/pricing/) - Cost information
 
 ---
-
-## License
-
-MIT License - See LICENSE file
-
----
-
 ## Credits
 
 Built on top of:
