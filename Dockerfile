@@ -1,4 +1,4 @@
-# Security Tools API Server
+# MCP Security Tools API Server
 # Uses pre-built binaries (no Go compilation required)
 
 FROM python:3.11-slim
@@ -65,11 +65,9 @@ RUN curl -sL https://github.com/tomnomnom/assetfinder/releases/download/v0.1.1/a
 RUN curl -sL https://github.com/sensepost/gowitness/releases/download/2.5.1/gowitness-2.5.1-linux-amd64 -o /usr/local/bin/gowitness \
     && chmod +x /usr/local/bin/gowitness
 
-# Download cero for TLS cert domains
-RUN curl -sL https://github.com/glebarez/cero/releases/download/v1.3.0/cero_1.3.0_linux_amd64.tar.gz -o /tmp/cero.tar.gz \
-    && tar -xzf /tmp/cero.tar.gz -C /usr/local/bin/ \
-    && chmod +x /usr/local/bin/cero \
-    && rm -rf /tmp/cero.tar.gz
+# Download cero for TLS cert domains (direct binary)
+RUN curl -sL https://github.com/glebarez/cero/releases/download/v1.3.0/cero-linux-amd64 -o /usr/local/bin/cero \
+    && chmod +x /usr/local/bin/cero
 
 # Update nuclei templates
 RUN nuclei -update-templates || true
