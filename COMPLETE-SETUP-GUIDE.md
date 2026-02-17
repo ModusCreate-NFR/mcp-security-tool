@@ -464,7 +464,7 @@ The original project is well-built, but it's designed for **stdio transport with
 ### Repository Structure
 
 ```
-security-tools-api/
+mcp-security-tool/
 ├── server.py           # Main server - runs on EC2
 ├── client.py           # Chat client - runs on user's machine
 ├── Dockerfile          # Container definition
@@ -554,7 +554,7 @@ CMD ["python", "server.py"]
 
 | Setting | Value | Notes |
 |---------|-------|-------|
-| Name | `security-tools-server` | Descriptive name |
+| Name | `mcp-security-tools` | Descriptive name |
 | AMI | Amazon Linux 2023 | Free tier eligible |
 | Instance Type | `t2.micro` or `t3.small` | t2.micro is free tier |
 | Key Pair | Create new: `security-tools-key` | Download .pem file! |
@@ -586,7 +586,7 @@ icacls "$env:USERPROFILE\.ssh\security-tools-key.pem" /inheritance:r /grant:r "$
 
 **Connect:**
 ```bash
-ssh -i ~/.ssh/security-tools-key.pem ec2-user@YOUR_EC2_PUBLIC_IP
+ssh -i ~/.ssh/security-tools-key.pem ec2-user@OUR_EC2_PUBLIC_IP
 ```
 
 ### Step 4: Install Docker on EC2
@@ -613,7 +613,7 @@ exit
 
 **Reconnect:**
 ```bash
-ssh -i ~/.ssh/security-tools-key.pem ec2-user@YOUR_EC2_PUBLIC_IP
+ssh -i ~/.ssh/security-tools-key.pem ec2-user@OUR_EC2_PUBLIC_IP
 ```
 
 **Verify Docker works:**
@@ -629,8 +629,8 @@ docker run hello-world
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/security-tools-api.git
-cd security-tools-api
+git clone https://github.com/ModusCreate-NFR/mcp-security-tool.git
+cd mcp-security-tool
 ```
 
 ### Step 2: Build Docker Image
@@ -844,8 +844,8 @@ The `client.py` script connects Claude's intelligence with your EC2 tools, enabl
 
 **Step 1: Clone the repository (if not already done)**
 ```bash
-git clone https://github.com/YOUR_USERNAME/security-tools-api.git
-cd security-tools-api
+git clone https://github.com/ModusCreate-NFR/mcp-security-tool.git
+cd mcp-security-tool
 ```
 
 **Step 2: Install dependencies**
@@ -940,8 +940,8 @@ Each team member needs:
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/security-tools-api.git
-cd security-tools-api
+git clone https://github.com/ModusCreate-NFR/mcp-security-tool.git
+cd mcp-security-tool
 
 # 2. Install Python dependencies
 pip install -r requirements.txt
@@ -1179,6 +1179,5 @@ curl http://EC2_IP:8000/mcp/v1/tools
 | Feb 11, 2026 | 1.0 | Initial documentation |
 
 ---
-
-**Created by:** Security Tools API Team  
-**Last Updated:** February 11, 2026
+ 
+**Last Updated:** February 17, 2026
