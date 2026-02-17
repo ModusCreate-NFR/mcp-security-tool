@@ -1,5 +1,5 @@
 """
-MCP Security Assessment Tool - AWS Bedrock Edition
+MCP Security Assessment Tool - Powered by Modus Create
 Professional black-box security assessment tool with AI-powered analysis.
 
 Usage:
@@ -10,9 +10,9 @@ Environment Variables:
     MCP_SERVER_URL: URL of your security tools server (default: http://localhost:8000)
     AWS_REGION: AWS region for Bedrock (default: us-east-1)
     BEDROCK_MODEL: Model ID - options:
-        - anthropic.claude-3-opus-20240229-v1:0 (most intelligent - recommended for comprehensive assessments)
-        - anthropic.claude-3-5-sonnet-20241022-v2:0 (fast and smart - good for quick scans)
-        - anthropic.claude-3-5-haiku-20241022-v1:0 (fastest - single tool operations)
+        - anthropic.claude-3-5-sonnet-20241022-v2:0 (recommended - fast and intelligent)
+        - anthropic.claude-3-5-haiku-20241022-v1:0 (fastest - simple operations)
+        - us.anthropic.claude-3-opus-20240229-v1:0 (cross-region inference profile for Opus)
 """
 import boto3
 import httpx
@@ -25,8 +25,8 @@ from botocore.config import Config
 # Configuration
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8000")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-# Default to Opus for comprehensive security assessments
-BEDROCK_MODEL = os.environ.get("BEDROCK_MODEL", "anthropic.claude-3-opus-20240229-v1:0")
+# Default to Sonnet (Opus requires inference profile on Bedrock)
+BEDROCK_MODEL = os.environ.get("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0")
 
 # Session storage for report generation
 SESSION_LOG = []
@@ -811,10 +811,10 @@ def chat(user_message: str, conversation: list = None) -> tuple[str, list]:
     
     # System prompt for professional pentesting
     system = [{
-        "text": """You are an elite penetration tester conducting a black-box security assessment. You have access to industry-standard security tools and must use them systematically.
+        "text": """You are Claude, an elite Security Specialist and penetration tester conducting a black-box security assessment. You have access to industry-standard security tools and must use them systematically.
 
 ## YOUR ROLE
-You are performing authorized security assessments for clients. When given a target, you must conduct a THOROUGH assessment using multiple tools in the correct methodology order.
+You are Claude, a Security Specialist performing authorized security assessments for clients. When given a target, you must conduct a THOROUGH assessment using multiple tools in the correct methodology order.
 
 ## ASSESSMENT METHODOLOGY
 For comprehensive assessments, ALWAYS follow this order and use ALL relevant tools:
@@ -991,14 +991,14 @@ def print_banner():
     model_name = BEDROCK_MODEL.split("anthropic.")[-1].split("-v")[0] if "anthropic" in BEDROCK_MODEL else BEDROCK_MODEL
     
     print("\n" + "=" * 70)
-    print("   __  __  ____ ____    ____  _____ ____ ")
-    print("  |  \\/  |/ ___|  _ \\  / ___|| ____/ ___|")
-    print("  | |\\/| | |   | |_) | \\___ \\|  _|| |    ")
-    print("  | |  | | |___|  __/   ___) | |__| |___ ")
-    print("  |_|  |_|\\____|_|     |____/|_____\\____|")
+    print("   __  __  ___  ____  _   _ ____    __  __  ____ ____  ")
+    print("  |  \\/  |/ _ \\|  _ \\| | | / ___|  |  \\/  |/ ___|  _ \\ ")
+    print("  | |\\/| | | | | | | | | | \\___ \\  | |\\/| | |   | |_) |")
+    print("  | |  | | |_| | |_| | |_| |___) | | |  | | |___|  __/ ")
+    print("  |_|  |_|\\___/|____/ \\___/|____/  |_|  |_|\\____|_|    ")
     print("")
-    print("  MCP Security Assessment Tool")
-    print("  Black-Box Penetration Testing Platform")
+    print("  MODUS MCP Security Assessment Tool")
+    print("  Powered by Modus Create | Black-Box Penetration Testing")
     print("=" * 70)
     print(f"\n  Server:  {MCP_SERVER_URL}")
     print(f"  Model:   {model_name}")
