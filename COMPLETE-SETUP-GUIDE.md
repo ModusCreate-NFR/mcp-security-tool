@@ -1,10 +1,8 @@
-# Security Tools API - Complete Setup Guide
+# MCP Security Tools API - Complete Setup Guide
 
 ## AI-Powered Security Assessment Platform
 
 **Date:** February 2026  
-**Purpose:** Bypass Claude Desktop's network restrictions by deploying security tools to AWS EC2
-
 ---
 
 ## Table of Contents
