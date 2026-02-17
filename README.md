@@ -518,11 +518,6 @@ See [COMPLETE-SETUP-GUIDE.md](COMPLETE-SETUP-GUIDE.md) for the full technical jo
 
 ---
 
-## License
-
-MIT License - See LICENSE file
-
----
 
 ## Credits
 
