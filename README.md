@@ -402,7 +402,7 @@ You: Scan wordpress-site.com for WordPress vulnerabilities and enumerate plugins
 |----------|---------|-------------|
 | `MCP_SERVER_URL` | http://localhost:8000 | EC2 server URL |
 | `AWS_REGION` | us-east-1 | AWS region for Bedrock |
-| `BEDROCK_MODEL` | anthropic.claude-3-opus-20240229-v1:0 | Claude model |
+| `BEDROCK_MODEL` | claude-3-5-sonnet-20241022 | Claude model |
 
 ### Model Selection
 
