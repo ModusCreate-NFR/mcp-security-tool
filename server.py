@@ -18,6 +18,8 @@ Endpoints:
     POST /mcp/v1/tools/{tool_name}  - Execute a tool
     GET  /sse                       - MCP SSE endpoint
 """
+from http.client import HTTP_PORT
+import os
 from fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
@@ -65,7 +67,9 @@ Available tool categories:
 - Specialized (wpscan, scoutsuite, mobsf)
 """
 )
-
+# Get transport mode from environment variable
+TRANSPORT_MODE = os.getenv("MCP_TRANSPORT", "stdio")
+HTTP_PORT = int(os.getenv("MCP_PORT", "8000"))
 
 # =============================================================================
 # NETWORK TOOLS
@@ -632,10 +636,17 @@ app = Starlette(
     ]
 )
 
-
 if __name__ == "__main__":
-    import uvicorn
-    
+    if TRANSPORT_MODE == "http":
+        print(f"Starting Nmap MCP Server on HTTP at port {HTTP_PORT}")
+        print(f"Server will be accessible at http://0.0.0.0:{HTTP_PORT}/mcp")
+# Use FastMCP's built-in HTTP support
+        mcp.run(transport="http", host="0.0.0.0", port=HTTP_PORT)
+    else:
+        print("Starting Nmap MCP Server on stdio")
+        mcp.run()
+
+
     print("\n" + "=" * 60)
     print("  Security Tools MCP Server")
     print("=" * 60)
