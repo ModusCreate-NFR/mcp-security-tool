@@ -9,10 +9,10 @@ Usage:
 Environment Variables:
     MCP_SERVER_URL: URL of your security tools server (default: http://localhost:8000)
     AWS_REGION: AWS region for Bedrock (default: us-east-1)
-    BEDROCK_MODEL: Model ID - options:
-        - anthropic.claude-3-5-sonnet-20241022-v2:0 (recommended - fast and intelligent)
-        - anthropic.claude-3-5-haiku-20241022-v1:0 (fastest - simple operations)
-        - us.anthropic.claude-3-opus-20240229-v1:0 (cross-region inference profile for Opus)
+    BEDROCK_MODEL: Model ID (all require cross-region inference profile):
+        - us.anthropic.claude-3-5-sonnet-20241022-v2:0 (default - fast and intelligent)
+        - us.anthropic.claude-3-5-haiku-20241022-v1:0 (fastest - simple operations)
+        - us.anthropic.claude-3-opus-20240229-v1:0 (most capable - comprehensive assessments)
 """
 import boto3
 import httpx
@@ -25,8 +25,8 @@ from botocore.config import Config
 # Configuration
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8000")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-# Default to Sonnet (Opus requires inference profile on Bedrock)
-BEDROCK_MODEL = os.environ.get("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+# Use cross-region inference profile (required for Claude 3.5 models on Bedrock)
+BEDROCK_MODEL = os.environ.get("BEDROCK_MODEL", "us.anthropic.claude-3-5-sonnet-20241022-v2:0")
 
 # Session storage for report generation
 SESSION_LOG = []
@@ -1014,7 +1014,7 @@ def print_banner():
     print("    clear    - Reset session")
     print("    quit     - Exit")
     print("\n  Example:")
-    print("    ► Perform comprehensive security assessment of https://example.com")
+    print("    Security Specialist: Perform comprehensive assessment of example.com")
     print("=" * 70 + "\n")
 
 
@@ -1182,15 +1182,11 @@ def main():
     # Check for single query mode
     if len(sys.argv) > 1:
         query = " ".join(sys.argv[1:])
-        print(f"┌─ Query ─────────────────────────────────────────────────────┐")
-        print(f"│ {query[:60]:<60} │")
-        print(f"└─────────────────────────────────────────────────────────────┘")
+        print(f"\nSecurity Specialist: {query}")
         response, _ = chat(query)
-        print(f"\n{'═' * 70}")
-        print("ANALYSIS")
-        print(f"{'═' * 70}")
-        print(response)
-        print(f"{'═' * 70}\n")
+        print(f"\n{'─' * 70}")
+        print("Claude:", response)
+        print(f"{'─' * 70}\n")
         return
     
     # Interactive mode
@@ -1198,7 +1194,7 @@ def main():
     
     while True:
         try:
-            user_input = input("\n► ").strip()
+            user_input = input("\nSecurity Specialist: ").strip()
         except (KeyboardInterrupt, EOFError):
             print("\n\nAssessment session ended.")
             break
@@ -1221,11 +1217,9 @@ def main():
             continue
         
         response, conversation = chat(user_input, conversation)
-        print(f"\n{'═' * 70}")
-        print("ANALYSIS")
-        print(f"{'═' * 70}")
-        print(response)
-        print(f"{'═' * 70}")
+        print(f"\n{'─' * 70}")
+        print("Claude:", response)
+        print(f"{'─' * 70}")
 
 
 if __name__ == "__main__":
