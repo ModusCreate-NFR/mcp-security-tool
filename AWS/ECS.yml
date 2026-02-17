@@ -14,6 +14,21 @@ Parameters:
     Description: "Environment name (dev, staging, prod)"
     AllowedPattern: "^[0-9a-zA-Z-/]*$"
   
+  GitHubRepo:
+    Type: String
+    Description: "GitHub repository name (e.g., username/repo)"
+    Default: ""
+  
+  GitHubBranch:
+    Type: String
+    Description: "GitHub branch to track"
+    Default: "main"
+  
+  GitHubConnectionArn:
+    Type: String
+    Description: "ARN of CodeStar Connection for GitHub (leave empty to skip pipeline creation)"
+    Default: ""
+  
   VPCNET:
     Type: String
     Description: "VPC CIDR block"
@@ -86,42 +101,12 @@ Parameters:
     Type: String
     Description: "ARN of ACM certificate for HTTPS (leave empty for HTTP only)"
     Default: ""
-  
-  EnableCICD:
-    Type: String
-    Description: "Enable CI/CD pipeline with CodePipeline, CodeBuild, and CodeDeploy"
-    Default: "false"
-    AllowedValues:
-      - "true"
-      - "false"
-  
-  GitHubConnectionArn:
-    Type: String
-    Description: "ARN of GitHub connection (required if EnableCICD is true)"
-    Default: ""
-  
-  GitHubRepositoryId:
-    Type: String
-    Description: "GitHub repository in format: owner/repo-name (e.g., myuser/myrepo)"
-    Default: ""
-  
-  GitHubBranch:
-    Type: String
-    Description: "GitHub branch to monitor"
-    Default: "main"
-  
-  BuildComputeType:
-    Type: String
-    Default: BUILD_GENERAL1_SMALL
-    Description: "CodeBuild compute type"
-    AllowedValues:
-      - BUILD_GENERAL1_SMALL
-      - BUILD_GENERAL1_MEDIUM
-      - BUILD_GENERAL1_LARGE
 
 Conditions:
   UseHTTPS: !Not [!Equals [!Ref CertificateArn, ""]]
-  CreateCICD: !Equals [!Ref EnableCICD, "true"]
+  CreatePipeline: !And
+    - !Not [!Equals [!Ref GitHubRepo, ""]]
+    - !Not [!Equals [!Ref GitHubConnectionArn, ""]]
 
 Resources:
   # VPC and Networking
@@ -296,6 +281,60 @@ Resources:
       RouteTableId: !Ref PrivateRouteTableTwo
       SubnetId: !Ref PrivateSubnetTwo
 
+  # VPC Endpoints for SSM Session Manager
+  SSMEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for SSM VPC endpoints
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VPCNET
+      Tags:
+        - Key: Name
+          Value: !Sub ${CustomerName}-${EnvironmentName}-SSM-Endpoints
+
+  SSMEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetOne
+        - !Ref PrivateSubnetTwo
+      SecurityGroupIds:
+        - !Ref SSMEndpointSecurityGroup
+
+  SSMMessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssmmessages
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetOne
+        - !Ref PrivateSubnetTwo
+      SecurityGroupIds:
+        - !Ref SSMEndpointSecurityGroup
+
+  EC2MessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetOne
+        - !Ref PrivateSubnetTwo
+      SecurityGroupIds:
+        - !Ref SSMEndpointSecurityGroup
+
   # ECS Cluster
   ECSCluster:
     Type: AWS::ECS::Cluster
@@ -312,9 +351,7 @@ Resources:
       GroupDescription: Security group for ECS container instances
       VpcId: !Ref VPC
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8000
-          ToPort: 8000
+        - IpProtocol: -1
           SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
       SecurityGroupEgress:
         - IpProtocol: -1
@@ -605,7 +642,7 @@ Resources:
   # S3 Bucket for Pipeline Artifacts
   ArtifactBucket:
     Type: AWS::S3::Bucket
-    Condition: CreateCICD
+    Condition: CreatePipeline
     Properties:
       BucketName: !Sub ${CustomerName}-${EnvironmentName}-pipeline-artifacts
       VersioningConfiguration:
@@ -631,7 +668,7 @@ Resources:
   # IAM Role for CodePipeline
   CodePipelineServiceRole:
     Type: AWS::IAM::Role
-    Condition: CreateCICD
+    Condition: CreatePipeline
     Properties:
       RoleName: !Sub ${CustomerName}-${EnvironmentName}-CodePipelineRole
       AssumeRolePolicyDocument:
@@ -675,12 +712,12 @@ Resources:
                 Resource: !Ref GitHubConnectionArn
       Tags:
         - Key: Name
-          Value: !Sub ${CustomerName}-${EnvironmentName}
+          Value: !Sub ${CustomerName}-${EnvironmentName}-CodePipeline
 
   # IAM Role for CodeBuild
   CodeBuildServiceRole:
     Type: AWS::IAM::Role
-    Condition: CreateCICD
+    Condition: CreatePipeline
     Properties:
       RoleName: !Sub ${CustomerName}-${EnvironmentName}-CodeBuildRole
       AssumeRolePolicyDocument:
@@ -732,7 +769,7 @@ Resources:
   # CloudWatch Log Group for CodeBuild
   CodeBuildLogGroup:
     Type: AWS::Logs::LogGroup
-    Condition: CreateCICD
+    Condition: CreatePipeline
     Properties:
       LogGroupName: !Sub /aws/codebuild/${CustomerName}-${EnvironmentName}
       RetentionInDays: 7
@@ -740,7 +777,7 @@ Resources:
   # CodeBuild Project
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
-    Condition: CreateCICD
+    Condition: CreatePipeline
     Properties:
       Name: !Sub ${CustomerName}-${EnvironmentName}-build
       Description: Build Docker image and push to ECR
@@ -749,7 +786,7 @@ Resources:
         Type: CODEPIPELINE
       Environment:
         Type: LINUX_CONTAINER
-        ComputeType: !Ref BuildComputeType
+        ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/standard:7.0
         PrivilegedMode: true
         EnvironmentVariables:
@@ -779,7 +816,7 @@ Resources:
   # CodePipeline
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
-    Condition: CreateCICD
+    Condition: CreatePipeline
     Properties:
       Name: !Sub ${CustomerName}-${EnvironmentName}
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
@@ -797,7 +834,7 @@ Resources:
                 Version: '1'
               Configuration:
                 ConnectionArn: !Ref GitHubConnectionArn
-                FullRepositoryId: !Ref GitHubRepositoryId
+                FullRepositoryId: !Ref GitHubRepo
                 BranchName: !Ref GitHubBranch
                 OutputArtifactFormat: CODE_ZIP
               OutputArtifacts:
@@ -867,26 +904,26 @@ Outputs:
       Name: !Sub ${CustomerName}-${EnvironmentName}-VPC
   
   PipelineName:
-    Condition: CreateCICD
+    Condition: CreatePipeline
     Description: Name of the CodePipeline
     Value: !Ref Pipeline
     Export:
       Name: !Sub ${CustomerName}-${EnvironmentName}-Pipeline
   
   PipelineUrl:
-    Condition: CreateCICD
+    Condition: CreatePipeline
     Description: URL of the CodePipeline
     Value: !Sub https://console.aws.amazon.com/codesuite/codepipeline/pipelines/${Pipeline}/view
   
   CodeBuildProjectName:
-    Condition: CreateCICD
+    Condition: CreatePipeline
     Description: Name of the CodeBuild project
     Value: !Ref CodeBuildProject
     Export:
       Name: !Sub ${CustomerName}-${EnvironmentName}-CodeBuild
   
   ArtifactBucketName:
-    Condition: CreateCICD
+    Condition: CreatePipeline
     Description: Name of the S3 artifact bucket
     Value: !Ref ArtifactBucket
     Export:
