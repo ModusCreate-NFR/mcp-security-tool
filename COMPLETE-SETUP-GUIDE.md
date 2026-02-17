@@ -970,7 +970,7 @@ python client.py
                          │
                          ▼
               ┌─────────────────────┐
-              │   YOUR EC2 SERVER   │
+              │   OUR EC2 SERVER   │
               │   (Shared by team)  │
               │                     │
               │   security-tools    │
