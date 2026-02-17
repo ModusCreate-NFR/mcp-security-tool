@@ -1,0 +1,93 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo Repository URI is $REPOSITORY_URI
+      - echo Image tag is $IMAGE_TAG
+  
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Writing image definitions file...
+      - printf '[{"name":"%s","imageUri":"%s"}]' $CUSTOMER_NAME-$ENV_NAME $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+      - cat imagedefinitions.json
+      - echo Writing taskdef and appspec files...
+      - |
+        cat > taskdef.json <<EOF
+        {
+          "family": "$CUSTOMER_NAME-$ENV_NAME",
+          "executionRoleArn": "arn:aws:iam::$AWS_ACCOUNT_ID:role/$CUSTOMER_NAME-$ENV_NAME-TaskExecution",
+          "networkMode": "bridge",
+          "containerDefinitions": [
+            {
+              "name": "$CUSTOMER_NAME-$ENV_NAME",
+              "image": "<IMAGE1_NAME>",
+              "memory": 512,
+              "memoryReservation": 256,
+              "essential": true,
+              "portMappings": [
+                {
+                  "containerPort": 8000,
+                  "hostPort": 0,
+                  "protocol": "tcp"
+                }
+              ],
+              "environment": [
+                {
+                  "name": "MCP_TRANSPORT",
+                  "value": "http"
+                },
+                {
+                  "name": "MCP_PORT",
+                  "value": "8000"
+                }
+              ],
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "/ecs/$CUSTOMER_NAME-$ENV_NAME",
+                  "awslogs-region": "$AWS_DEFAULT_REGION",
+                  "awslogs-stream-prefix": "ecs"
+                }
+              }
+            }
+          ],
+          "requiresCompatibilities": ["EC2"]
+        }
+        EOF
+      - cat taskdef.json
+      - |
+        cat > appspec.yaml <<EOF
+        version: 0.0
+        Resources:
+          - TargetService:
+              Type: AWS::ECS::Service
+              Properties:
+                TaskDefinition: <TASK_DEFINITION>
+                LoadBalancerInfo:
+                  ContainerName: "$CUSTOMER_NAME-$ENV_NAME"
+                  ContainerPort: 8000
+        EOF
+      - cat appspec.yaml
+
+artifacts:
+  files:
+    - imagedefinitions.json
+    - taskdef.json
+    - appspec.yaml

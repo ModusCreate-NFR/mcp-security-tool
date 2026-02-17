@@ -86,9 +86,42 @@ Parameters:
     Type: String
     Description: "ARN of ACM certificate for HTTPS (leave empty for HTTP only)"
     Default: ""
+  
+  EnableCICD:
+    Type: String
+    Description: "Enable CI/CD pipeline with CodePipeline, CodeBuild, and CodeDeploy"
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  
+  GitHubConnectionArn:
+    Type: String
+    Description: "ARN of GitHub connection (required if EnableCICD is true)"
+    Default: ""
+  
+  GitHubRepositoryId:
+    Type: String
+    Description: "GitHub repository in format: owner/repo-name (e.g., myuser/myrepo)"
+    Default: ""
+  
+  GitHubBranch:
+    Type: String
+    Description: "GitHub branch to monitor"
+    Default: "main"
+  
+  BuildComputeType:
+    Type: String
+    Default: BUILD_GENERAL1_SMALL
+    Description: "CodeBuild compute type"
+    AllowedValues:
+      - BUILD_GENERAL1_SMALL
+      - BUILD_GENERAL1_MEDIUM
+      - BUILD_GENERAL1_LARGE
 
 Conditions:
   UseHTTPS: !Not [!Equals [!Ref CertificateArn, ""]]
+  CreateCICD: !Equals [!Ref EnableCICD, "true"]
 
 Resources:
   # VPC and Networking
@@ -568,6 +601,239 @@ Resources:
         - Type: spread
           Field: instanceId
 
+  # CI/CD Resources
+  # S3 Bucket for Pipeline Artifacts
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateCICD
+    Properties:
+      BucketName: !Sub ${CustomerName}-${EnvironmentName}-pipeline-artifacts
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+      Tags:
+        - Key: Name
+          Value: !Sub ${CustomerName}-${EnvironmentName}-artifacts
+
+  # IAM Role for CodePipeline
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Condition: CreateCICD
+    Properties:
+      RoleName: !Sub ${CustomerName}-${EnvironmentName}-CodePipelineRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub ${ArtifactBucket.Arn}/*
+              - Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                Resource: !GetAtt CodeBuildProject.Arn
+              - Effect: Allow
+                Action:
+                  - ecs:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codestar-connections:UseConnection
+                Resource: !Ref GitHubConnectionArn
+      Tags:
+        - Key: Name
+          Value: !Sub ${CustomerName}-${EnvironmentName}
+
+  # IAM Role for CodeBuild
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Condition: CreateCICD
+    Properties:
+      RoleName: !Sub ${CustomerName}-${EnvironmentName}-CodeBuildRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CustomerName}-${EnvironmentName}
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CustomerName}-${EnvironmentName}:*
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                Resource:
+                  - !Sub ${ArtifactBucket.Arn}/*
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:PutImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecs:DescribeTaskDefinition
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub ${CustomerName}-${EnvironmentName}
+
+  # CloudWatch Log Group for CodeBuild
+  CodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: CreateCICD
+    Properties:
+      LogGroupName: !Sub /aws/codebuild/${CustomerName}-${EnvironmentName}
+      RetentionInDays: 7
+
+  # CodeBuild Project
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Condition: CreateCICD
+    Properties:
+      Name: !Sub ${CustomerName}-${EnvironmentName}-build
+      Description: Build Docker image and push to ECR
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: !Ref BuildComputeType
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: IMAGE_REPO_NAME
+            Value: !Sub ${CustomerName}-${EnvironmentName}
+          - Name: IMAGE_TAG
+            Value: latest
+          - Name: CUSTOMER_NAME
+            Value: !Ref CustomerName
+          - Name: ENV_NAME
+            Value: !Ref EnvironmentName
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref CodeBuildLogGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${CustomerName}-${EnvironmentName}
+
+  # CodePipeline
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Condition: CreateCICD
+    Properties:
+      Name: !Sub ${CustomerName}-${EnvironmentName}
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: '1'
+              Configuration:
+                ConnectionArn: !Ref GitHubConnectionArn
+                FullRepositoryId: !Ref GitHubRepositoryId
+                BranchName: !Ref GitHubBranch
+                OutputArtifactFormat: CODE_ZIP
+              OutputArtifacts:
+                - Name: SourceOutput
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+        - Name: Deploy
+          Actions:
+            - Name: DeployAction
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ECS
+                Version: '1'
+              Configuration:
+                ClusterName: !Ref ECSCluster
+                ServiceName: !Sub ${CustomerName}-${EnvironmentName}
+                FileName: imagedefinitions.json
+              InputArtifacts:
+                - Name: BuildOutput
+      Tags:
+        - Key: Name
+          Value: !Sub ${CustomerName}-${EnvironmentName}
+
 Outputs:
   LoadBalancerDNS:
     Description: DNS name of the load balancer
@@ -599,3 +865,29 @@ Outputs:
     Value: !Ref VPC
     Export:
       Name: !Sub ${CustomerName}-${EnvironmentName}-VPC
+  
+  PipelineName:
+    Condition: CreateCICD
+    Description: Name of the CodePipeline
+    Value: !Ref Pipeline
+    Export:
+      Name: !Sub ${CustomerName}-${EnvironmentName}-Pipeline
+  
+  PipelineUrl:
+    Condition: CreateCICD
+    Description: URL of the CodePipeline
+    Value: !Sub https://console.aws.amazon.com/codesuite/codepipeline/pipelines/${Pipeline}/view
+  
+  CodeBuildProjectName:
+    Condition: CreateCICD
+    Description: Name of the CodeBuild project
+    Value: !Ref CodeBuildProject
+    Export:
+      Name: !Sub ${CustomerName}-${EnvironmentName}-CodeBuild
+  
+  ArtifactBucketName:
+    Condition: CreateCICD
+    Description: Name of the S3 artifact bucket
+    Value: !Ref ArtifactBucket
+    Export:
+      Name: !Sub ${CustomerName}-${EnvironmentName}-ArtifactBucket
