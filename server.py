@@ -2,12 +2,13 @@
 Security Tools MCP Server
 Exposes security tools via HTTP/SSE for Claude API integration.
 
-This server provides 15 security tools organized by category:
+This server provides 25 security tools organized by category:
 - Network: nmap, masscan, httpx
-- DNS: dns_lookup, whois, crtsh
-- Web: http_headers, ffuf, katana, waybackurls
-- Vulnerability: nuclei, sqlmap, sslscan
-- Recon: amass, assetfinder
+- DNS: dns_lookup, whois, crtsh, cero
+- Web: http_headers, ffuf, katana, waybackurls, arjun
+- Vulnerability: nuclei, sqlmap, sslscan, commix, smuggler
+- Recon: amass, assetfinder, alterx, shuffledns, gowitness
+- Specialized: wpscan, scoutsuite, mobsf
 
 Usage:
     python server.py
@@ -35,6 +36,16 @@ from tools import (
     nuclei_scan, sqlmap_scan, sslscan_check,
     # Recon tools
     amass_enum, assetfinder_enum,
+    # Injection tools
+    commix_scan, smuggler_scan,
+    # WordPress
+    wpscan_scan,
+    # Cloud
+    scoutsuite_scan,
+    # Discovery tools
+    alterx_generate, arjun_scan, shuffledns_scan, gowitness_screenshot, cero_scan,
+    # Mobile
+    mobsf_scan,
 )
 
 # Initialize FastMCP server
@@ -46,10 +57,12 @@ IMPORTANT: Only use these tools on targets you have explicit permission to test.
 
 Available tool categories:
 - Network scanning (nmap, masscan, httpx)
-- DNS reconnaissance (dns_lookup, whois, crtsh)
-- Web application testing (headers, ffuf, katana, waybackurls)
-- Vulnerability scanning (nuclei, sqlmap, sslscan)
-- Subdomain enumeration (amass, assetfinder)
+- DNS reconnaissance (dns_lookup, whois, crtsh, cero)
+- Web application testing (headers, ffuf, katana, waybackurls, arjun)
+- Vulnerability scanning (nuclei, sqlmap, sslscan, commix, smuggler)
+- Subdomain enumeration (amass, assetfinder, alterx, shuffledns)
+- Visual recon (gowitness)
+- Specialized (wpscan, scoutsuite, mobsf)
 """
 )
 
@@ -283,6 +296,232 @@ def tool_assetfinder_enum(domain: str, subs_only: bool = True) -> str:
 
 
 # =============================================================================
+# INJECTION TOOLS
+# =============================================================================
+
+@mcp.tool()
+def tool_commix_scan(
+    url: str,
+    data: Optional[str] = None,
+    cookie: Optional[str] = None,
+    level: int = 1,
+    technique: Optional[str] = None
+) -> str:
+    """
+    Test for OS command injection vulnerabilities using Commix.
+    
+    Args:
+        url: Target URL with parameters to test
+        data: POST data for POST requests
+        cookie: Cookie header value
+        level: Test level 1-3 (higher = more thorough)
+        technique: Specific technique (classic, eval-based, time-based, file-based)
+    """
+    return commix_scan(url, data, cookie, level, technique)
+
+
+@mcp.tool()
+def tool_smuggler_scan(
+    url: str,
+    method: str = "POST",
+    timeout: int = 10,
+    verbose: bool = False
+) -> str:
+    """
+    Test for HTTP Request Smuggling vulnerabilities.
+    
+    Args:
+        url: Target URL to test
+        method: HTTP method (GET or POST)
+        timeout: Request timeout in seconds
+        verbose: Enable verbose output
+    """
+    return smuggler_scan(url, method, timeout, verbose)
+
+
+# =============================================================================
+# WORDPRESS TOOLS
+# =============================================================================
+
+@mcp.tool()
+def tool_wpscan_scan(
+    url: str,
+    enumerate: Optional[List[str]] = None,
+    detection_mode: str = "mixed",
+    api_token: Optional[str] = None,
+    random_user_agent: bool = True,
+    force: bool = False
+) -> str:
+    """
+    Scan WordPress sites for vulnerabilities using WPScan.
+    
+    Args:
+        url: Target WordPress URL
+        enumerate: What to enumerate (vp, ap, vt, at, u, cb, dbe)
+        detection_mode: Detection mode (mixed, passive, aggressive)
+        api_token: WPScan API token
+        random_user_agent: Use random user agents
+        force: Force scan even if WordPress not detected
+    """
+    return wpscan_scan(url, enumerate, detection_mode, api_token, random_user_agent, force)
+
+
+# =============================================================================
+# CLOUD SECURITY TOOLS
+# =============================================================================
+
+@mcp.tool()
+def tool_scoutsuite_scan(
+    provider: str,
+    profile: Optional[str] = None,
+    regions: Optional[List[str]] = None,
+    services: Optional[List[str]] = None,
+    access_key: Optional[str] = None,
+    secret_key: Optional[str] = None
+) -> str:
+    """
+    Run Scout Suite for cloud security auditing.
+    
+    Args:
+        provider: Cloud provider (aws, azure, gcp)
+        profile: AWS/Azure profile name
+        regions: Specific regions to audit
+        services: Specific services to audit
+        access_key: AWS access key
+        secret_key: AWS secret key
+    """
+    return scoutsuite_scan(provider, profile, regions, services, access_key, secret_key)
+
+
+# =============================================================================
+# DISCOVERY TOOLS
+# =============================================================================
+
+@mcp.tool()
+def tool_alterx_generate(
+    domain: str,
+    pattern: Optional[str] = None,
+    wordlist: Optional[str] = None,
+    enrich: bool = True,
+    limit: int = 1000
+) -> str:
+    """
+    Generate subdomain wordlists using AlterX permutation patterns.
+    
+    Args:
+        domain: Base domain to permute
+        pattern: Custom permutation pattern
+        wordlist: Input wordlist to permute
+        enrich: Enrich with common patterns
+        limit: Maximum number of results
+    """
+    return alterx_generate(domain, pattern, wordlist, enrich, limit)
+
+
+@mcp.tool()
+def tool_arjun_scan(
+    url: str,
+    method: str = "GET",
+    wordlist: Optional[str] = None,
+    threads: int = 10,
+    timeout: int = 15,
+    stable: bool = False
+) -> str:
+    """
+    Discover hidden HTTP parameters using Arjun.
+    
+    Args:
+        url: Target URL to test
+        method: HTTP method (GET, POST, JSON, XML)
+        wordlist: Custom parameter wordlist
+        threads: Number of concurrent threads
+        timeout: Request timeout
+        stable: Use stable mode (slower but reliable)
+    """
+    return arjun_scan(url, method, wordlist, threads, timeout, stable)
+
+
+@mcp.tool()
+def tool_shuffledns_scan(
+    domain: str,
+    wordlist: Optional[str] = None,
+    resolvers: Optional[str] = None,
+    threads: int = 100
+) -> str:
+    """
+    Bruteforce subdomains using ShuffleDNS with massdns.
+    
+    Args:
+        domain: Target domain
+        wordlist: Subdomain wordlist path
+        resolvers: Custom DNS resolvers file
+        threads: Number of concurrent threads
+    """
+    return shuffledns_scan(domain, wordlist, resolvers, threads)
+
+
+@mcp.tool()
+def tool_gowitness_screenshot(
+    url: str,
+    timeout: int = 10,
+    fullpage: bool = False,
+    screenshot_path: str = "/tmp/screenshots"
+) -> str:
+    """
+    Capture screenshots of web pages using Gowitness.
+    
+    Args:
+        url: URL to screenshot
+        timeout: Page load timeout
+        fullpage: Capture full page
+        screenshot_path: Directory to save screenshots
+    """
+    return gowitness_screenshot(url, timeout, fullpage, screenshot_path)
+
+
+@mcp.tool()
+def tool_cero_scan(
+    targets: List[str],
+    concurrency: int = 100,
+    timeout: int = 5,
+    verbose: bool = False
+) -> str:
+    """
+    Probe TLS certificates to discover domains.
+    
+    Args:
+        targets: List of hosts/IPs to probe
+        concurrency: Number of concurrent connections
+        timeout: Connection timeout
+        verbose: Enable verbose output
+    """
+    return cero_scan(targets, concurrency, timeout, verbose)
+
+
+# =============================================================================
+# MOBILE SECURITY TOOLS
+# =============================================================================
+
+@mcp.tool()
+def tool_mobsf_scan(
+    file_path: str,
+    api_key: str,
+    api_url: str = "http://localhost:8000",
+    scan_type: Optional[str] = None
+) -> str:
+    """
+    Scan mobile applications using MobSF.
+    
+    Args:
+        file_path: Path to APK/IPA file
+        api_key: MobSF API key
+        api_url: MobSF API URL
+        scan_type: Force scan type (apk, ipa, zip, appx)
+    """
+    return mobsf_scan(file_path, api_key, api_url, scan_type)
+
+
+# =============================================================================
 # REST API CONFIGURATION
 # =============================================================================
 
@@ -312,6 +551,26 @@ TOOL_FUNCTIONS = {
     # Recon
     "amass_enum": amass_enum,
     "assetfinder_enum": assetfinder_enum,
+    
+    # Injection
+    "commix_scan": commix_scan,
+    "smuggler_scan": smuggler_scan,
+    
+    # WordPress
+    "wpscan_scan": wpscan_scan,
+    
+    # Cloud
+    "scoutsuite_scan": scoutsuite_scan,
+    
+    # Discovery
+    "alterx_generate": alterx_generate,
+    "arjun_scan": arjun_scan,
+    "shuffledns_scan": shuffledns_scan,
+    "gowitness_screenshot": gowitness_screenshot,
+    "cero_scan": cero_scan,
+    
+    # Mobile
+    "mobsf_scan": mobsf_scan,
 }
 
 
@@ -343,10 +602,11 @@ async def list_tools(request):
     """List available tools with descriptions."""
     tools_info = {
         "network": ["nmap_scan", "masscan_scan", "httpx_probe"],
-        "dns": ["dns_lookup", "whois_lookup", "crtsh_lookup"],
-        "web": ["http_headers_check", "ffuf_fuzz", "katana_crawl", "waybackurls_fetch"],
-        "vulnerability": ["nuclei_scan", "sqlmap_scan", "sslscan_check"],
-        "recon": ["amass_enum", "assetfinder_enum"],
+        "dns": ["dns_lookup", "whois_lookup", "crtsh_lookup", "cero_scan"],
+        "web": ["http_headers_check", "ffuf_fuzz", "katana_crawl", "waybackurls_fetch", "arjun_scan"],
+        "vulnerability": ["nuclei_scan", "sqlmap_scan", "sslscan_check", "commix_scan", "smuggler_scan"],
+        "recon": ["amass_enum", "assetfinder_enum", "alterx_generate", "shuffledns_scan", "gowitness_screenshot"],
+        "specialized": ["wpscan_scan", "scoutsuite_scan", "mobsf_scan"],
     }
     return JSONResponse({
         "tools": list(TOOL_FUNCTIONS.keys()),
@@ -384,12 +644,13 @@ if __name__ == "__main__":
     print("    GET  /mcp/v1/tools        - List tools")
     print("    POST /mcp/v1/tools/{name} - Execute tool")
     print("    GET  /sse                 - MCP SSE endpoint")
-    print("\n  Tools Available: 15")
-    print("    Network:  nmap, masscan, httpx")
-    print("    DNS:      dns_lookup, whois, crtsh")
-    print("    Web:      headers, ffuf, katana, waybackurls")
-    print("    Vuln:     nuclei, sqlmap, sslscan")
-    print("    Recon:    amass, assetfinder")
+    print("\n  Tools Available: 25")
+    print("    Network:     nmap, masscan, httpx")
+    print("    DNS:         dns_lookup, whois, crtsh, cero")
+    print("    Web:         headers, ffuf, katana, waybackurls, arjun")
+    print("    Vuln:        nuclei, sqlmap, sslscan, commix, smuggler")
+    print("    Recon:       amass, assetfinder, alterx, shuffledns, gowitness")
+    print("    Specialized: wpscan, scoutsuite, mobsf")
     print("\n" + "=" * 60 + "\n")
     
     uvicorn.run(app, host="0.0.0.0", port=8000)
