@@ -1,4 +1,4 @@
-# MCP Security Tools API Server
+# Security Tools API Server
 # Uses pre-built binaries (no Go compilation required)
 
 FROM python:3.11-slim
@@ -103,12 +103,14 @@ COPY server.py .
 
 # Expose port
 EXPOSE 8000
+ENV MCP_TRANSPORT=http
+ENV MCP_PORT=8000
 
 # Set chromium path for gowitness
 ENV CHROMIUM_PATH=/usr/bin/chromium
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# Health check (increased timeout for slow first response)
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the server
