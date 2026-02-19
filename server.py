@@ -637,16 +637,8 @@ app = Starlette(
 )
 
 if __name__ == "__main__":
-    if TRANSPORT_MODE == "http":
-        print(f"Starting Nmap MCP Server on HTTP at port {HTTP_PORT}")
-        print(f"Server will be accessible at http://0.0.0.0:{HTTP_PORT}/mcp")
-# Use FastMCP's built-in HTTP support
-        mcp.run(transport="http", host="0.0.0.0", port=HTTP_PORT)
-    else:
-        print("Starting Nmap MCP Server on stdio")
-        mcp.run()
-
-
+    import uvicorn
+    
     print("\n" + "=" * 60)
     print("  Security Tools MCP Server")
     print("=" * 60)
@@ -655,7 +647,7 @@ if __name__ == "__main__":
     print("    GET  /mcp/v1/tools        - List tools")
     print("    POST /mcp/v1/tools/{name} - Execute tool")
     print("    GET  /sse                 - MCP SSE endpoint")
-    print("\n  Tools Available: 25")
+    print(f"\n  Tools Available: {len(TOOL_FUNCTIONS)}")
     print("    Network:     nmap, masscan, httpx")
     print("    DNS:         dns_lookup, whois, crtsh, cero")
     print("    Web:         headers, ffuf, katana, waybackurls, arjun")
