@@ -990,32 +990,23 @@ def print_banner():
     """Print the welcome banner."""
     model_name = BEDROCK_MODEL.split("anthropic.")[-1].split("-v")[0] if "anthropic" in BEDROCK_MODEL else BEDROCK_MODEL
     
-    print("\n" + "=" * 70)
-    print("   __  __  ___  ____  _   _ ____    __  __  ____ ____  ")
-    print("  |  \\/  |/ _ \\|  _ \\| | | / ___|  |  \\/  |/ ___|  _ \\ ")
-    print("  | |\\/| | | | | | | | | | \\___ \\  | |\\/| | |   | |_) |")
-    print("  | |  | | |_| | |_| | |_| |___) | | |  | | |___|  __/ ")
-    print("  |_|  |_|\\___/|____/ \\___/|____/  |_|  |_|\\____|_|    ")
-    print("")
-    print("  MODUS MCP Security Assessment Tool")
-    print("  Powered by Modus Create | Black-Box Penetration Testing")
-    print("=" * 70)
-    print(f"\n  Server:  {MCP_SERVER_URL}")
-    print(f"  Model:   {model_name}")
-    print(f"  Region:  {AWS_REGION}")
-    print("\n  Assessment Phases:")
-    print("    1. Recon:      whois, dns, crtsh")
-    print("    2. Enum:       amass, assetfinder")
-    print("    3. Discovery:  nmap, masscan, httpx")
-    print("    4. Web:        headers, katana, waybackurls, ffuf")
-    print("    5. Vuln:       nuclei, sqlmap, sslscan")
-    print("\n  Commands:")
-    print("    report   - Generate markdown assessment report")
-    print("    clear    - Reset session")
-    print("    quit     - Exit")
-    print("\n  Example:")
-    print("    Security Specialist: Perform comprehensive assessment of example.com")
-    print("=" * 70 + "\n")
+    banner = f"""
+======================================================================
+  MODUS MCP Security Assessment Tool
+  Powered by Modus Create | Black-Box Penetration Testing
+======================================================================
+
+  Server:  {MCP_SERVER_URL}
+  Model:   {model_name}
+  Region:  {AWS_REGION}
+
+  Commands: report, clear, quit
+
+  Example:
+    Security Specialist: Perform comprehensive assessment of example.com
+======================================================================
+"""
+    print(banner)
 
 
 def generate_report():
