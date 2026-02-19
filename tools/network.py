@@ -60,18 +60,28 @@ def masscan_scan(target: str, ports: str = "1-1000", rate: int = 1000) -> str:
     Fast port scanning using masscan.
     
     Args:
-        target: IP address or CIDR range to scan (e.g., "192.168.1.0/24")
+        target: IP address, CIDR range, or domain to scan (e.g., "192.168.1.0/24", "example.com")
         ports: Port range to scan (e.g., "80,443" or "1-65535")
         rate: Packets per second (default 1000, max 100000)
     
     Returns:
         Masscan results
     """
+    import socket
+    
     # Limit rate to prevent abuse
     rate = min(rate, 10000)
     
+    # Resolve domain to IP if needed (masscan only accepts IPs)
+    resolved_target = target
+    if not target.replace(".", "").replace("/", "").isdigit():
+        try:
+            resolved_target = socket.gethostbyname(target)
+        except socket.gaierror:
+            return f"Error: Could not resolve domain '{target}' to IP address"
+    
     try:
-        cmd = ["masscan", f"-p{ports}", target, f"--rate={rate}"]
+        cmd = ["masscan", f"-p{ports}", resolved_target, f"--rate={rate}"]
         result = subprocess.run(
             cmd,
             capture_output=True,
