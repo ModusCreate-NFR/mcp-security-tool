@@ -6,7 +6,20 @@ Network Scanning Tools
 """
 import subprocess
 import shlex
+import socket
+from urllib.parse import urlparse
 from typing import Optional, List
+
+
+def _extract_hostname(target: str) -> str:
+    """Extract hostname from URL or return as-is if already a hostname/IP."""
+    target = target.strip()
+    # If it looks like a URL (has ://), parse it
+    if "://" in target:
+        parsed = urlparse(target)
+        return parsed.netloc.split(":")[0] if parsed.netloc else target
+    # Remove any trailing path/port
+    return target.split("/")[0].split(":")[0]
 
 
 def nmap_scan(target: str, scan_type: str = "quick", ports: Optional[str] = None) -> str:
@@ -28,6 +41,9 @@ def nmap_scan(target: str, scan_type: str = "quick", ports: Optional[str] = None
         "udp": "-sU --top-ports 50", # UDP scan, top 50 ports
         "comprehensive": "-sV -sC -O --top-ports 1000",  # Version, scripts, OS detection
     }
+    
+    # Extract hostname from URL if needed
+    target = _extract_hostname(target)
     
     args = scan_args.get(scan_type, scan_args["quick"])
     
@@ -60,25 +76,31 @@ def masscan_scan(target: str, ports: str = "1-1000", rate: int = 1000) -> str:
     Fast port scanning using masscan.
     
     Args:
-        target: IP address, CIDR range, or domain to scan (e.g., "192.168.1.0/24", "example.com")
+        target: IP address, hostname, or CIDR range to scan
         ports: Port range to scan (e.g., "80,443" or "1-65535")
-        rate: Packets per second (default 1000, max 100000)
+        rate: Packets per second (default 1000, max 10000)
     
     Returns:
         Masscan results
     """
     import socket
+    import re
     
     # Limit rate to prevent abuse
     rate = min(rate, 10000)
     
-    # Resolve domain to IP if needed (masscan only accepts IPs)
+    # Check if target is a hostname (not IP or CIDR) and resolve it
     resolved_target = target
-    if not target.replace(".", "").replace("/", "").isdigit():
+    ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?$'
+    
+    if not re.match(ip_pattern, target):
+        # It's a hostname, try to resolve
         try:
-            resolved_target = socket.gethostbyname(target)
+            resolved_ip = socket.gethostbyname(target)
+            resolved_target = resolved_ip
+            print(f"[masscan] Resolved {target} to {resolved_ip}")
         except socket.gaierror:
-            return f"Error: Could not resolve domain '{target}' to IP address"
+            return f"Error: Could not resolve hostname '{target}' to IP address. Masscan requires an IP address."
     
     try:
         cmd = ["masscan", f"-p{ports}", resolved_target, f"--rate={rate}"]
